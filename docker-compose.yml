@@ -1,0 +1,51 @@
+version: '3.8'
+
+services:
+  # 1. PostgreSQL Database
+  db:
+    image: postgres:15-alpine
+    container_name: ig_database
+    environment:
+      POSTGRES_USER: guardian_user
+      POSTGRES_PASSWORD: secure_password_123
+      POSTGRES_DB: industrial_guardian_db
+    ports:
+      - "5434:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    restart: always
+
+  # 2. Redis Cache
+  redis:
+    image: redis:7-alpine
+    container_name: ig_redis
+    ports:
+      - "6379:6379"
+    restart: always
+
+  # 3. FastAPI Backend
+  backend:
+    build: ./backend
+    container_name: ig_backend
+    ports:
+      - "8000:8000"
+    environment:
+      DATABASE_URL: postgresql+asyncpg://guardian_user:secure_password_123@db:5432/industrial_guardian_db
+      REDIS_URL: redis://redis:6379/0
+    depends_on:
+      - db
+      - redis
+    restart: always
+
+  # 4. React Frontend
+  frontend:
+    build: ./frontend
+    container_name: ig_frontend
+    ports:
+      - "80:80"
+    depends_on:
+      - backend
+    restart: always
+
+volumes:
+  pgdata:
