@@ -1,5 +1,5 @@
 import GlobalShell from '../components/shell/GlobalShell';
-import UserManagement from '../components/admin/UserManagement';
+import UserManagement from '../components/settings/UserManagement';
 import SystemHealth from '../components/admin/SystemHealth';
 
 export default function SettingsPage() {
