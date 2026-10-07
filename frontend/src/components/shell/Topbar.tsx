@@ -1,4 +1,5 @@
-import { Bell, ChevronDown, Clock } from 'lucide-react';
+import { ChevronDown } from 'lucide-react'; // Removed Clock/Bell as HeaderControls handles them
+import HeaderControls from './HeaderControls';
 
 export default function Topbar() {
   return (
@@ -18,28 +19,8 @@ export default function Topbar() {
         </div>
       </div>
 
-      {/* Right Side: Clock, Notifications, User */}
-      <div className="flex items-center gap-6">
-        <div className="flex items-center gap-2 text-sm text-text-muted">
-          <Clock className="w-4 h-4" />
-          <span>Oct 03, 2026 · 14:32:18</span>
-        </div>
-
-        <button className="relative text-text-muted hover:text-text-primary transition-colors">
-          <Bell className="w-5 h-5" />
-          <span className="absolute -top-1 -right-1 w-4 h-4 bg-status-critical text-white text-[10px] font-bold flex items-center justify-center rounded-full">3</span>
-        </button>
-
-        <div className="flex items-center gap-3 pl-4 border-l border-border-panel cursor-pointer">
-          <div className="w-8 h-8 rounded-full bg-accent-primary/20 flex items-center justify-center text-accent-primary font-semibold text-sm">
-            OP
-          </div>
-          <div className="text-right">
-            <p className="text-sm font-medium text-text-primary">Operator</p>
-            <p className="text-xs text-text-muted">Plant Operator</p>
-          </div>
-        </div>
-      </div>
+      {/* Right Side: Dynamic Header Controls (Clock, Notifs, Profile) */}
+      <HeaderControls />
     </header>
   );
 }

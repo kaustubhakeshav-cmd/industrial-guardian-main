@@ -10,6 +10,7 @@ import IncidentManagementPage from './pages/IncidentManagementPage';
 import SimulationPage from './pages/SimulationPage';
 import ReportsPage from './pages/ReportsPage';
 import SettingsPage from './pages/SettingsPage';
+import AIAssistantPage from './pages/AIAssistantPage';
 // Simple protected route component
 const ProtectedRoute = ({ children, allowedRoles }: { children: React.ReactNode, allowedRoles: string[] }) => {
   const token = localStorage.getItem('token');
@@ -88,6 +89,14 @@ function App() {
      element={
        <ProtectedRoute allowedRoles={['operator', 'engineer', 'admin']}>
          <ReportsPage />
+       </ProtectedRoute>
+     } 
+   />
+      <Route 
+     path="/ai-assistant" 
+     element={
+       <ProtectedRoute allowedRoles={['operator', 'engineer', 'admin']}>
+         <AIAssistantPage />
        </ProtectedRoute>
      } 
    />

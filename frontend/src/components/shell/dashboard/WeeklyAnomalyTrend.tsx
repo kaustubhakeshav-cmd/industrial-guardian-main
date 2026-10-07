@@ -1,85 +1,78 @@
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
-import { TrendingUp, TrendingDown } from 'lucide-react';
-
-// Mock data for the weekly trend
-const weeklyData = [
-  { day: 'Mon', increase: 4, decrease: 2 },
-  { day: 'Tue', increase: 6, decrease: 1 },
-  { day: 'Wed', increase: 3, decrease: 4 },
-  { day: 'Thu', increase: 8, decrease: 2 },
-  { day: 'Fri', increase: 5, decrease: 3 },
-  { day: 'Sat', increase: 2, decrease: 5 },
-  { day: 'Sun', increase: 1, decrease: 2 },
-];
-
-// Mock data for equipment breakdown
-const equipmentData = [
-  { name: 'Heat Exchanger', count: 12, trend: '+40%' },
-  { name: 'Compressor', count: 9, trend: '+25%' },
-  { name: 'Reactor', count: 7, trend: '-17%' },
-  { name: 'Turbine', count: 5, trend: '-33%' },
-  { name: 'Pump', count: 3, trend: '-50%' },
-];
+import { useEffect, useState } from 'react';
+import axios from 'axios';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts';
+import { TrendingUp } from 'lucide-react';
 
 export default function WeeklyAnomalyTrend() {
+  const [data, setData] = useState<any[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchTrend = async () => {
+      try {
+        const res = await axios.get('http://127.0.0.1:8000/api/dashboard/weekly-trend');
+        setData(res.data.trend);
+      } catch (error) {
+        console.error("Failed to fetch weekly trend:", error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    fetchTrend();
+  }, []);
+
+  if (isLoading) {
+    return (
+      <div className="bg-bg-panel border border-border-panel rounded-xl p-6 h-[300px] flex items-center justify-center">
+        <span className="text-text-muted animate-pulse">Loading weekly trends...</span>
+      </div>
+    );
+  }
+
   return (
-    <div className="bg-bg-panel border border-border-panel rounded-xl p-6 h-full flex flex-col">
-      <div className="flex items-center justify-between mb-6">
+    <div className="bg-bg-panel border border-border-panel rounded-xl p-6 h-[300px] flex flex-col">
+      <div className="flex items-center justify-between mb-4">
         <div>
-          <h2 className="text-lg font-semibold text-text-primary">Weekly Anomaly Trend</h2>
-          <p className="text-xs text-text-muted mt-1">All Appliances · Week of Oct 26</p>
+          <h3 className="text-lg font-semibold text-text-primary">Weekly Anomaly Trend</h3>
+          <p className="text-xs text-text-muted mt-1">Total anomalies detected over the last 7 days</p>
         </div>
-        <button className="px-3 py-1 text-xs font-medium rounded bg-bg-page text-text-muted border border-border-panel hover:text-text-primary transition-colors">
-          This Week
-        </button>
+        <div className="flex items-center gap-1 text-status-good text-xs font-medium bg-status-good/10 px-2 py-1 rounded border border-status-good/20">
+          <TrendingUp className="w-3 h-3" /> Live Data
+        </div>
       </div>
 
-      {/* Bar Chart */}
-      <div className="h-48 mb-6">
+      <div className="flex-1 w-full">
         <ResponsiveContainer width="100%" height="100%">
-          <BarChart data={weeklyData} margin={{ top: 5, right: 0, left: -20, bottom: 0 }}>
+          <BarChart data={data} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
             <CartesianGrid strokeDasharray="3 3" stroke="#1C2C45" vertical={false} />
-            <XAxis dataKey="day" stroke="#7C8AA5" fontSize={12} tickLine={false} axisLine={false} />
-            <YAxis stroke="#7C8AA5" fontSize={12} tickLine={false} axisLine={false} />
+            <XAxis 
+              dataKey="day" 
+              stroke="#7C8AA5" 
+              fontSize={12} 
+              tickLine={false} 
+              axisLine={false} 
+            />
+            <YAxis 
+              stroke="#7C8AA5" 
+              fontSize={12} 
+              tickLine={false} 
+              axisLine={false} 
+              allowDecimals={false}
+            />
             <Tooltip 
               contentStyle={{ backgroundColor: '#0A1626', border: '1px solid #1C2C45', borderRadius: '8px', color: '#E8EDF5' }}
-              cursor={{ fill: 'rgba(255,255,255,0.05)' }}
+              cursor={{ fill: 'rgba(255, 255, 255, 0.05)' }}
+              formatter={(value: any) => [`${value} Anomalies`, 'Count']}
             />
-            <Legend wrapperStyle={{ color: '#7C8AA5', fontSize: '12px' }} />
-            <Bar dataKey="increase" name="Increase" stackId="a" fill="#F53F55" radius={[0, 0, 0, 0]} />
-            <Bar dataKey="decrease" name="Decrease" stackId="a" fill="#1DB87C" radius={[4, 4, 0, 0]} />
+            <Bar dataKey="anomalies" radius={[4, 4, 0, 0]} maxBarSize={40}>
+              {data.map((entry, index) => {
+                // Dynamic coloring: Red for high, Yellow for medium, Green for low
+                const color = entry.anomalies > 5 ? '#EF4444' : entry.anomalies > 2 ? '#F59E0B' : '#22C55E';
+                return <Cell key={`cell-${index}`} fill={color} />;
+              })}
+            </Bar>
           </BarChart>
         </ResponsiveContainer>
-      </div>
-
-      {/* Equipment Breakdown */}
-      <div>
-        <h3 className="text-sm font-semibold text-text-primary mb-3">Top 5 Appliances by Anomaly Count</h3>
-        <div className="space-y-3">
-          {equipmentData.map((item, index) => (
-            <div key={index} className="flex items-center justify-between text-sm">
-              <div className="flex items-center gap-3 w-1/3">
-                <span className="text-text-muted w-4">{index + 1}</span>
-                <span className="text-text-primary truncate">{item.name}</span>
-              </div>
-              <div className="flex-1 mx-4">
-                <div className="w-full bg-bg-page rounded-full h-1.5">
-                  <div 
-                    className="h-1.5 rounded-full bg-accent-primary" 
-                    style={{ width: `${(item.count / 12) * 100}%` }}
-                  ></div>
-                </div>
-              </div>
-              <div className="w-16 text-right flex items-center justify-end gap-1">
-                <span className="text-text-muted">{item.count}</span>
-                <span className={`text-xs font-medium ${item.trend.startsWith('+') ? 'text-status-critical' : 'text-status-good'}`}>
-                  {item.trend.startsWith('+') ? <TrendingUp className="w-3 h-3" /> : <TrendingDown className="w-3 h-3" />}
-                  {item.trend}
-                </span>
-              </div>
-            </div>
-          ))}
-        </div>
       </div>
     </div>
   );

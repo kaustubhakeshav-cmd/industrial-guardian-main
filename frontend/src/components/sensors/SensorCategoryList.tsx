@@ -1,58 +1,111 @@
-import { Activity, Thermometer, Wind, Waves, Gauge, Cpu } from 'lucide-react';
-import type { LucideIcon } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import axios from 'axios';
+import { Gauge, Thermometer, Waves, Activity, Waves as Level, Cpu } from 'lucide-react';
 
 interface Category {
-  id: string;
   name: string;
   count: number;
-  icon: LucideIcon;
+  icon: any;
 }
-
-const categories: Category[] = [
-  { id: 'pressure', name: 'Pressure', count: 12, icon: Gauge },
-  { id: 'temperature', name: 'Temperature', count: 10, icon: Thermometer },
-  { id: 'flow', name: 'Flow Rate', count: 8, icon: Wind },
-  { id: 'vibration', name: 'Vibration', count: 6, icon: Activity },
-  { id: 'level', name: 'Level', count: 4, icon: Waves },
-  { id: 'others', name: 'Others', count: 8, icon: Cpu },
-];
 
 interface SensorCategoryListProps {
   activeCategory: string;
-  onCategoryChange: (id: string) => void;
+  onCategoryChange: (category: string) => void;
 }
 
 export default function SensorCategoryList({ activeCategory, onCategoryChange }: SensorCategoryListProps) {
+  const [categories, setCategories] = useState<Category[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    console.log("🔄 Fetching sensor categories...");
+    
+    const fetchCounts = async () => {
+      try {
+        const res = await axios.get('http://127.0.0.1:8000/api/sensors');
+        const sensors = res.data;
+        
+        console.log("✅ Received sensors:", sensors.length);
+        
+        const counts: Record<string, number> = {
+          'Pressure': 0,
+          'Temperature': 0,
+          'Flow Rate': 0,
+          'Vibration': 0,
+          'Level': 0,
+          'Others': 0,
+        };
+
+        sensors.forEach((sensor: any) => {
+          const sensorId = sensor.sensor_id || '';
+          console.log(`Sensor: ${sensorId}`);
+          
+          if (sensorId.startsWith('P')) counts['Pressure']++;
+          else if (sensorId.startsWith('T')) counts['Temperature']++;
+          else if (sensorId.startsWith('F')) counts['Flow Rate']++;
+          else if (sensorId.startsWith('V')) counts['Vibration']++;
+          else if (sensorId.startsWith('L')) counts['Level']++;
+          else counts['Others']++;
+        });
+
+        console.log("📊 Counts:", counts);
+
+        setCategories([
+          { name: 'Pressure', count: counts['Pressure'], icon: Gauge },
+          { name: 'Temperature', count: counts['Temperature'], icon: Thermometer },
+          { name: 'Flow Rate', count: counts['Flow Rate'], icon: Waves },
+          { name: 'Vibration', count: counts['Vibration'], icon: Activity },
+          { name: 'Level', count: counts['Level'], icon: Level },
+          { name: 'Others', count: counts['Others'], icon: Cpu },
+        ]);
+        setLoading(false);
+      } catch (error) {
+        console.error("❌ Failed to fetch category counts:", error);
+        setLoading(false);
+      }
+    };
+
+    fetchCounts();
+  }, []);
+
+  if (loading) {
+    return (
+      <div className="bg-bg-panel border border-border-panel rounded-xl p-6 h-full flex items-center justify-center">
+        <span className="text-text-muted animate-pulse">Loading categories...</span>
+      </div>
+    );
+  }
+
   return (
-    <div className="bg-bg-panel border border-border-panel rounded-xl p-6 h-full flex flex-col">
-      <h2 className="text-lg font-semibold text-text-primary mb-4">Sensor Categories</h2>
-      
-      <div className="flex-1 space-y-2 overflow-y-auto pr-2">
-        {categories.map((cat) => {
-          const Icon = cat.icon;
-          const isActive = activeCategory === cat.id;
+    <div className="bg-bg-panel border border-border-panel rounded-xl p-6 h-full">
+      <h3 className="text-lg font-semibold text-text-primary mb-4">Sensor Categories</h3>
+      <div className="space-y-2">
+        {categories.map((category) => {
+          const Icon = category.icon;
+          const isActive = activeCategory === category.name;
+          
           return (
             <button
-              key={cat.id}
-              onClick={() => onCategoryChange(cat.id)}
+              key={category.name}
+              onClick={() => onCategoryChange(category.name)}
               className={`w-full flex items-center justify-between p-3 rounded-lg border transition-all ${
                 isActive 
-                  ? 'bg-sidebar-active-bg border-accent-primary/30 text-accent-primary' 
-                  : 'bg-bg-page border-border-panel text-text-muted hover:text-text-primary hover:border-text-muted/30'
+                  ? 'bg-accent-primary/10 border-accent-primary text-accent-primary' 
+                  : 'bg-bg-page/50 border-border-panel text-text-muted hover:bg-bg-page hover:border-border-panel/60'
               }`}
             >
               <div className="flex items-center gap-3">
-                <Icon className="w-5 h-5" />
-                <span className="text-sm font-medium">{cat.name}</span>
+                <Icon className="w-4 h-4" />
+                <span className="text-sm font-medium">{category.name}</span>
               </div>
               <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${
-                isActive ? 'bg-accent-primary/20 text-accent-primary' : 'bg-bg-panel text-text-muted'
+                isActive ? 'bg-accent-primary/20' : 'bg-bg-panel'
               }`}>
-                {cat.count}
+                {category.count}
               </span>
             </button>
           );
-        })}
+        })}ss
       </div>
     </div>
   );

@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import axios from 'axios';
 import { CheckCircle, AlertTriangle, AlertCircle, Clock, Download } from 'lucide-react';
-
+import SmartAssigneeBadge from './SmartAssigneeBadge';
 interface Incident {
   id: number;
   sensor_id: string;
@@ -153,19 +153,25 @@ export default function IncidentTable() {
                     <td className="py-3 px-4 text-text-muted text-xs">
                       {new Date(incident.timestamp).toLocaleString()}
                     </td>
-                    <td className="py-3 px-4 text-right">
+                                        <td className="py-3 px-4 text-right">
                       {!isResolved ? (
-                        <button
-                          onClick={() => handleResolve(incident.id)}
-                          disabled={resolvingId === incident.id}
-                          className="px-3 py-1.5 text-xs font-medium rounded-lg bg-status-good/10 text-status-good border border-status-good/20 hover:bg-status-good/20 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center gap-1 ml-auto"
-                        >
-                          {resolvingId === incident.id ? (
-                            <>Processing...</>
-                          ) : (
-                            <><CheckCircle className="w-3 h-3" /> Resolve</>
-                          )}
-                        </button>
+                        <div className="flex flex-col items-end gap-2">
+                          {/* AI Smart Assignee Recommendation */}
+                          <SmartAssigneeBadge incidentId={incident.id} />
+                          
+                          {/* Resolve Button */}
+                          <button
+                            onClick={() => handleResolve(incident.id)}
+                            disabled={resolvingId === incident.id}
+                            className="px-3 py-1.5 text-xs font-medium rounded-lg bg-status-good/10 text-status-good border border-status-good/20 hover:bg-status-good/20 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center gap-1"
+                          >
+                            {resolvingId === incident.id ? (
+                              <>Processing...</>
+                            ) : (
+                              <><CheckCircle className="w-3 h-3" /> Resolve</>
+                            )}
+                          </button>
+                        </div>
                       ) : (
                         <span className="text-xs text-text-muted flex items-center justify-end gap-1">
                           <CheckCircle className="w-3 h-3 text-status-good" /> 

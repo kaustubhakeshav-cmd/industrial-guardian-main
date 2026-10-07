@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import axios from 'axios';
-import { TrendingUp, TrendingDown, Minus } from 'lucide-react';
+import { TrendingUp, TrendingDown, Minus, Download } from 'lucide-react';
+import RULBadge from './RULBadge';
 
 const statusConfig = {
   good: { color: 'text-status-good', bg: 'bg-status-good/10', border: 'border-status-good/20', label: 'Normal' },
@@ -27,7 +28,6 @@ export default function SensorTable({ activeCategory }: SensorTableProps) {
   const [sensors, setSensors] = useState<RealSensor[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
-  // Fetch real data from the backend when the component loads
   useEffect(() => {
     const fetchSensors = async () => {
       try {
@@ -43,17 +43,54 @@ export default function SensorTable({ activeCategory }: SensorTableProps) {
     fetchSensors();
   }, []);
 
-  // Filter sensors based on the selected category
-  const filteredSensors = activeCategory === 'all' 
-    ? sensors 
-    : sensors.filter(s => s.area.toLowerCase().includes(activeCategory) || s.sensor_id.toLowerCase().includes(activeCategory));
+  const handleExportCSV = async () => {
+    try {
+      const response = await axios.get('http://127.0.0.1:8000/api/sensors/export', {
+        responseType: 'blob',
+      });
+      const url = window.URL.createObjectURL(new Blob([response.data]));
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', `sensors_export_${new Date().toISOString().split('T')[0]}.csv`);
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
+    } catch (error) {
+      console.error("Failed to export CSV:", error);
+      alert("Failed to export CSV. Please try again.");
+    }
+  };
+
+  // Simple, robust filtering that matches your original working logic
+  // Replace the filteredSensors logic with this:
+// Replace the filteredSensors logic with this:
+const filteredSensors = activeCategory === 'all' 
+  ? sensors 
+  : sensors.filter(s => {
+      // Match by sensor_id prefix (most reliable)
+      if (activeCategory === 'Pressure' && s.sensor_id.startsWith('P')) return true;
+      if (activeCategory === 'Temperature' && s.sensor_id.startsWith('T')) return true;
+      if (activeCategory === 'Flow Rate' && s.sensor_id.startsWith('F')) return true;
+      if (activeCategory === 'Vibration' && s.sensor_id.startsWith('V')) return true;
+      if (activeCategory === 'Level' && s.sensor_id.startsWith('L')) return true;
+      
+      // Fallback: match by area or name (case-insensitive)
+      const categoryLower = activeCategory.toLowerCase();
+      return s.area.toLowerCase().includes(categoryLower) || 
+             s.name.toLowerCase().includes(categoryLower);
+    });
 
   return (
     <div className="bg-bg-panel border border-border-panel rounded-xl p-6 h-full flex flex-col">
       <div className="flex items-center justify-between mb-6">
         <h2 className="text-lg font-semibold text-text-primary">Sensor Readings</h2>
         <div className="flex gap-2">
-           <button className="px-3 py-1.5 text-xs font-medium rounded-lg bg-accent-primary/10 text-accent-primary border border-accent-primary/20">
+           <button 
+             onClick={handleExportCSV}
+             className="px-3 py-1.5 text-xs font-medium rounded-lg bg-accent-primary/10 text-accent-primary border border-accent-primary/20 hover:bg-accent-primary/20 transition-colors flex items-center gap-2"
+           >
+             <Download className="w-3 h-3" />
              Export CSV
            </button>
         </div>
@@ -68,24 +105,22 @@ export default function SensorTable({ activeCategory }: SensorTableProps) {
               <th className="py-3 px-4 font-medium">Current Value</th>
               <th className="py-3 px-4 font-medium">24h Change</th>
               <th className="py-3 px-4 font-medium">Status</th>
+              <th className="py-3 px-4 font-medium">Predicted RUL</th>
             </tr>
           </thead>
           <tbody className="text-sm">
             {isLoading ? (
               <tr>
-                <td colSpan={5} className="py-8 text-center text-text-muted">Loading real telemetry data...</td>
+                <td colSpan={6} className="py-8 text-center text-text-muted">Loading real telemetry data...</td>
               </tr>
             ) : filteredSensors.length === 0 ? (
               <tr>
-                <td colSpan={5} className="py-8 text-center text-text-muted">No sensors found in this category.</td>
+                <td colSpan={6} className="py-8 text-center text-text-muted">No sensors found in this category.</td>
               </tr>
             ) : (
               filteredSensors.map((sensor) => {
-                // Determine status based on the real is_anomaly flag from the database
                 const status = sensor.is_anomaly ? 'critical' : 'good';
                 const config = statusConfig[status as keyof typeof statusConfig];
-                
-                // Mock a small 24h change for visual flair (we will make this real later)
                 const mockChange = sensor.is_anomaly ? 15.4 : (Math.random() * 5 - 2.5).toFixed(1);
 
                 return (
@@ -107,6 +142,9 @@ export default function SensorTable({ activeCategory }: SensorTableProps) {
                       <span className={`text-xs font-semibold px-2.5 py-1 rounded-full border ${config.bg} ${config.color} ${config.border}`}>
                         {config.label}
                       </span>
+                    </td>
+                    <td className="py-3 px-4">
+                      <RULBadge sensorId={sensor.sensor_id} />
                     </td>
                   </tr>
                 );
