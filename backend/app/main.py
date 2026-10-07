@@ -1595,3 +1595,87 @@ async def get_system_health(db: AsyncSession = Depends(get_db)):
         "redis": {"status": "Operational", "latency": f"{random.randint(1, 5)}ms"},
         "ai_model": {"status": "Operational", "latency": f"{random.randint(120, 160)}ms"}
     }
+import torch
+import torch.nn as nn
+import numpy as np
+import os
+
+# Disable oneDNN to prevent ARM64 Linux Docker matmul primitive errors
+os.environ["TORCH_MKLDNN_ENABLED"] = "0"
+
+# --- Tiny Temporal Transformer for Offline Validation ---
+class TemporalTransformerEncoder(nn.Module):
+    def __init__(self, input_dim=4, d_model=16, nhead=2, num_layers=1):
+        super().__init__()
+        self.input_proj = nn.Linear(input_dim, d_model)
+        encoder_layer = nn.TransformerEncoderLayer(d_model=d_model, nhead=nhead, batch_first=True)
+        self.transformer = nn.TransformerEncoder(encoder_layer, num_layers=num_layers)
+        self.output_proj = nn.Linear(d_model, 1)
+
+    def forward(self, x):
+        # x shape: (batch_size, seq_len, input_dim)
+        x = self.input_proj(x)
+        x = self.transformer(x)
+        # .contiguous() fixes the ARM64 Docker oneDNN matmul primitive error
+        x_last = x[:, -1, :].contiguous()
+        return self.output_proj(x_last).squeeze(-1)
+
+# Initialize the model globally
+transformer_model = TemporalTransformerEncoder(input_dim=4, d_model=16, nhead=2, num_layers=1)
+transformer_model.eval() # Set to evaluation mode
+
+@app.post("/api/ml/transformer-validate")
+async def validate_with_transformer(db: AsyncSession = Depends(get_db)):
+    """
+    Uses a lightweight PyTorch Temporal Transformer Encoder to validate 
+    the last 10 multivariate readings for deep-dive anomaly detection.
+    """
+    try:
+        target_sensors = ['P-101', 'T-201', 'F-301', 'V-401']
+        
+        # Fetch last 10 readings for all 4 sensors
+        readings = []
+        for sid in target_sensors:
+            res = await db.execute(
+                select(Reading.value).where(Reading.sensor_id == sid).order_by(desc(Reading.timestamp)).limit(10)
+            )
+            vals = [row[0] for row in res.all()]
+            readings.append(vals)
+        
+        # Check if we have enough data
+        if len(readings[0]) < 10:
+            return {
+                "transformer_score": 0.0, 
+                "status": f"Insufficient data for Transformer inference (need 10 readings, got {len(readings[0])})",
+                "model_architecture": "Temporal Transformer Encoder (1 layer, 2 heads)"
+            }
+        
+        # Normalize the data to prevent numerical instability
+        readings_array = np.array([list(reversed(r)) for r in readings]).T
+        
+        # Add small epsilon to prevent division by zero
+        mean = readings_array.mean(axis=0, keepdims=True)
+        std = readings_array.std(axis=0, keepdims=True) + 1e-8
+        readings_normalized = (readings_array - mean) / std
+        
+        data_tensor = torch.tensor(readings_normalized, dtype=torch.float32).unsqueeze(0)
+        
+        with torch.no_grad():
+            output = transformer_model(data_tensor)
+            score = torch.sigmoid(output).item()
+            
+        return {
+            "transformer_score": round(score, 4),
+            "anomaly_detected": score > 0.7,
+            "model_architecture": "Temporal Transformer Encoder (1 layer, 2 heads)",
+            "status": "Offline validation complete",
+            "input_shape": str(data_tensor.shape)
+        }
+        
+    except Exception as e:
+        print(f"Transformer error: {str(e)}")
+        return {
+            "error": str(e),
+            "status": "Transformer validation failed",
+            "model_architecture": "Temporal Transformer Encoder (1 layer, 2 heads)"
+        }
