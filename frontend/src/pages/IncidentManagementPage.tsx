@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import React,{ useState, useEffect } from 'react';
 import axios from 'axios';
 import GlobalShell from '../components/shell/GlobalShell';
 import { AlertCircle, AlertTriangle, CheckCircle, Clock, Wrench, User, Bot, Download, RefreshCw, Check } from 'lucide-react';
@@ -8,45 +8,35 @@ export default function IncidentManagementPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [expandedRows, setExpandedRows] = useState<Record<number, any>>({});
 
-  // 1. Fetch Real Incidents
   const fetchIncidents = async () => {
     setIsLoading(true);
     try {
       const res = await axios.get('http://127.0.0.1:8000/api/incidents');
       setIncidents(res.data);
-    } catch (error) {
-      console.error("Failed to fetch incidents:", error);
-    } finally {
-      setIsLoading(false);
-    }
+    } catch (error) { console.error("Failed to fetch incidents:", error); } 
+    finally { setIsLoading(false); }
   };
 
+  // ✅ AUTO-REFRESH WHEN NAVIGATING TO THIS PAGE
   useEffect(() => {
     fetchIncidents();
   }, []);
 
-  // 2. Resolve Incident
   const handleResolve = async (id: number) => {
     try {
       await axios.put(`http://127.0.0.1:8000/api/incidents/${id}/resolve`);
-      fetchIncidents(); // Refresh list
-    } catch (error) {
-      console.error("Failed to resolve:", error);
-    }
+      fetchIncidents();
+    } catch (error) { console.error("Failed to resolve:", error); }
   };
 
-  // 3. Get AI Recommendation (Inline)
   const handleAiRecommend = async (id: number) => {
-    if (expandedRows[id]) return; // Already loaded
+    if (expandedRows[id]) return;
     try {
       const res = await axios.get(`http://127.0.0.1:8000/api/incidents/${id}/recommend-assignee`);
       setExpandedRows(prev => ({ ...prev, [id]: res.data }));
-    } catch (error) {
-      console.error("AI Recommend failed:", error);
-    }
+    } catch (error) { console.error("AI Recommend failed:", error); }
   };
 
-  // 4. Export CSV
   const handleExportCSV = async () => {
     try {
       const res = await axios.get('http://127.0.0.1:8000/api/incidents/export', { responseType: 'blob' });
@@ -54,15 +44,10 @@ export default function IncidentManagementPage() {
       const link = document.createElement('a');
       link.href = url;
       link.setAttribute('download', `incidents_export_${new Date().toISOString().split('T')[0]}.csv`);
-      document.body.appendChild(link);
-      link.click();
-      link.remove();
-    } catch (error) {
-      console.error("Export failed:", error);
-    }
+      document.body.appendChild(link); link.click(); link.remove();
+    } catch (error) { console.error("Export failed:", error); }
   };
 
-  // Calculate Summary Counts
   const openCount = incidents.filter(i => i.status === 'open').length;
   const progressCount = incidents.filter(i => i.status === 'investigating').length;
   const resolvedCount = incidents.filter(i => i.status === 'resolved').length;
@@ -82,7 +67,6 @@ export default function IncidentManagementPage() {
   return (
     <GlobalShell>
       <div className="space-y-6">
-        {/* Header */}
         <div className="flex justify-between items-center">
           <div>
             <h1 className="text-2xl font-semibold text-text-primary">Incident Management</h1>
@@ -139,29 +123,23 @@ export default function IncidentManagementPage() {
                 {isLoading ? (
                   <tr><td colSpan={6} className="py-8 text-center text-text-muted animate-pulse">Loading incidents...</td></tr>
                 ) : incidents.length === 0 ? (
-                  <tr><td colSpan={6} className="py-8 text-center text-text-muted">No incidents found.</td></tr>
+                  <tr><td colSpan={6} className="py-8 text-center text-text-muted">No incidents found. Try running a simulation!</td></tr>
                 ) : (
                   incidents.map((inc) => (
-                    <>
-                      <tr key={inc.id} className="hover:bg-bg-page/30 transition-colors">
-                        <td className={`py-4 px-4 font-medium capitalize flex items-center gap-2 ${
-                          inc.severity === 'critical' ? 'text-status-critical' : inc.severity === 'medium' ? 'text-status-warning' : 'text-status-good'
-                        }`}>
+                    <React.Fragment key={inc.id}>
+                      <tr className="hover:bg-bg-page/30 transition-colors">
+                        <td className={`py-4 px-4 font-medium capitalize flex items-center gap-2 ${inc.severity === 'critical' ? 'text-status-critical' : inc.severity === 'medium' ? 'text-status-warning' : 'text-status-good'}`}>
                           {getSeverityIcon(inc.severity)} {inc.severity}
                         </td>
                         <td className="py-4 px-4 font-mono text-text-primary">{inc.sensor_id}</td>
                         <td className="py-4 px-4 text-text-muted text-xs max-w-xs truncate">{inc.description || 'No description'}</td>
                         <td className="py-4 px-4">
-                          <span className={`text-xs font-semibold px-2.5 py-1 rounded-full border capitalize ${getStatusColor(inc.status)}`}>
-                            {inc.status}
-                          </span>
+                          <span className={`text-xs font-semibold px-2.5 py-1 rounded-full border capitalize ${getStatusColor(inc.status)}`}>{inc.status}</span>
                         </td>
                         <td className="py-4 px-4 text-text-muted text-xs">{new Date(inc.timestamp).toLocaleString()}</td>
                         <td className="py-4 px-4 text-right">
                           {inc.status === 'resolved' ? (
-                            <span className="text-xs text-status-good flex items-center justify-end gap-1">
-                              <Check className="w-3 h-3" /> Resolved by {inc.resolved_by || 'system'}
-                            </span>
+                            <span className="text-xs text-status-good flex items-center justify-end gap-1"><Check className="w-3 h-3" /> Resolved by {inc.resolved_by || 'system'}</span>
                           ) : (
                             <div className="flex justify-end gap-2">
                               <button onClick={() => handleAiRecommend(inc.id)} className="text-xs px-3 py-1.5 bg-accent-primary/10 text-accent-primary border border-accent-primary/20 rounded hover:bg-accent-primary/20 flex items-center gap-1">
@@ -174,8 +152,6 @@ export default function IncidentManagementPage() {
                           )}
                         </td>
                       </tr>
-                      
-                      {/* Inline AI Recommendation Card */}
                       {expandedRows[inc.id] && (
                         <tr key={`ai-${inc.id}`}>
                           <td colSpan={6} className="py-4 px-4 bg-bg-page/30">
@@ -189,16 +165,14 @@ export default function IncidentManagementPage() {
                                   <User className="w-4 h-4 text-text-muted" />
                                   <span className="font-semibold text-text-primary capitalize">{expandedRows[inc.id].recommended_user}</span>
                                 </div>
-                                <span className="text-xs font-bold text-status-warning bg-status-warning/10 px-2 py-0.5 rounded">
-                                  {expandedRows[inc.id].confidence_score}% Match
-                                </span>
+                                <span className="text-xs font-bold text-status-warning bg-status-warning/10 px-2 py-0.5 rounded">{expandedRows[inc.id].confidence_score}% Match</span>
                               </div>
                               <p className="text-xs text-text-muted italic">"{expandedRows[inc.id].reason}"</p>
                             </div>
                           </td>
                         </tr>
                       )}
-                    </>
+                    </React.Fragment>
                   ))
                 )}
               </tbody>

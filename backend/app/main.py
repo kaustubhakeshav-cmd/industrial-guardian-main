@@ -21,7 +21,9 @@ import io
 from app.models import Scenario
 from typing import Optional, Dict, Any
 import math
-
+from sqlalchemy.orm import Session
+from app.database import get_db
+from app.models import Incident, Sensor
 app = FastAPI(title="Industrial Guardian API")
 
 # Allow the React frontend (running on port 5173) to talk to this backend
@@ -1679,3 +1681,52 @@ async def validate_with_transformer(db: AsyncSession = Depends(get_db)):
             "status": "Transformer validation failed",
             "model_architecture": "Temporal Transformer Encoder (1 layer, 2 heads)"
         }
+
+# 1. Define the Request Schema
+class IncidentCreate(BaseModel):
+    sensor_id: str
+    severity: str
+    description: str
+    status: str = "open"
+
+# 2. Define the Response Schema (Matches your Incident Table exactly)
+class IncidentResponse(BaseModel):
+    id: int
+    sensor_id: str
+    timestamp: datetime
+    severity: str
+    status: str
+    description: Optional[str] = None
+    resolved_at: Optional[datetime] = None
+    resolved_by: Optional[str] = None
+
+    class Config:
+        from_attributes = True  # Allows SQLAlchemy ORM objects to be converted to Pydantic models
+
+# 3. The Endpoint
+@app.post("/api/incidents", response_model=IncidentResponse, status_code=201)
+# ❌ WRONG (Synchronous Session in Async App)
+
+async def create_incident(incident: IncidentCreate, db: AsyncSession = Depends(get_db)):
+    # Validate sensor exists
+    result = await db.execute(select(Sensor).where(Sensor.sensor_id == incident.sensor_id))
+    sensor = result.scalar_one_or_none()
+    if not sensor:
+        raise HTTPException(status_code=404, detail=f"Sensor {incident.sensor_id} not found")
+
+    new_incident = Incident(
+        sensor_id=incident.sensor_id,
+        severity=incident.severity.lower(),
+        description=incident.description,
+        status="open",
+        timestamp=datetime.now(timezone.utc)
+    )
+    
+    try:
+        db.add(new_incident)
+        await db.commit()      # ← MUST BE AWAIT
+        await db.refresh(new_incident)  # ← MUST BE AWAIT
+        return new_incident
+    except Exception as e:
+        await db.rollback()    # ← MUST BE AWAIT
+        raise HTTPException(status_code=500, detail=str(e))     
